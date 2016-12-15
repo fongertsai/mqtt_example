@@ -17,7 +17,7 @@ void handle_signal(int s)
 
 void connect_callback(struct mosquitto *mosq, void *obj, int result)
 {
-	printf("connect callback, rc=%d\n", result);
+	//printf("connect callback, rc=%d\n", result);
 }
 
 void my_publish_callback(struct mosquitto *mosq, void *obj, int mid)
@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
 	char clientid[24];
 	struct mosquitto *mosq;
 	int rc = 0;
+	int chk_sended = 0;
 
 	signal(SIGINT, handle_signal);
 	signal(SIGTERM, handle_signal);
@@ -45,21 +46,26 @@ int main(int argc, char *argv[])
 
 	if(mosq){
 		mosquitto_connect_callback_set(mosq, connect_callback);
-		mosquitto_publish_callback_set(mosq, my_publish_callback);
+		//mosquitto_publish_callback_set(mosq, my_publish_callback);
 		rc = mosquitto_connect(mosq, mqtt_host, mqtt_port, 60);
-		mosquitto_max_inflight_messages_set( mosq, 10000);
+		mosquitto_max_inflight_messages_set( mosq, 1000000);
 
 
 		int i;
 		char msg[128];
-		for ( i = 0; i < 100; i++) {
-			sprintf(msg, "Hello %d\n", i);
-			int ret = mosquitto_publish(mosq, NULL, "ABC", strlen(msg), msg,1,false);
+		for ( i = 0; i < atoi(argv[1]); i++) {
+			mosquitto_loop(mosq, -1, 1);
+			sprintf(msg, "Hello %d", i);
+			int ret = mosquitto_publish(mosq, &chk_sended, "ABC", strlen(msg), msg,2,true);
+			printf("Send %d\n",chk_sended);
 			if (ret != MOSQ_ERR_SUCCESS) {
 				printf("SEND %d ERROR\n", i);
 			}
+			usleep(10);
 		}
-		sleep(10);
+		while(1 && run) {
+			mosquitto_loop(mosq, -1, 1);
+		}
 		mosquitto_destroy(mosq);
 	}
 
