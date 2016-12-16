@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
+
+struct timespec start_time;
+struct timespec end_time;
 
 #include <mosquitto.h>
 
@@ -24,14 +29,37 @@ void connect_callback(struct mosquitto *mosq, void *obj, int result)
 void message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message)
 {
 	recv++;
-	//bool match = 0;
-	printf("got message '%.*s' for topic '%s'\n", message->payloadlen, (char*) message->payload, message->topic);
+	//printf("RECV = %d\n",recv);
 /*
-	mosquitto_topic_matches_sub("/devices/wb-adc/controls/+", message->topic, &match);
-	if (match) {
-		printf("got message for ADC topic\n");
+	if (recv < 599975) {
+		return;
 	}
 */
+	clock_gettime(CLOCK_REALTIME, &end_time);
+	if(end_time.tv_nsec > start_time.tv_nsec)
+	{
+		printf("[diff_time:%ld.%09ld sec]\n",
+				end_time.tv_sec - start_time.tv_sec,
+				end_time.tv_nsec - start_time.tv_nsec);
+	}
+	else
+	{
+		printf("[diff_time:%ld.%09ld sec]\n",
+				end_time.tv_sec - start_time.tv_sec - 1,
+				end_time.tv_nsec - start_time.tv_nsec + 1000*1000*1000);
+	}
+	//bool match = 0;
+	printf("got message '%.*s' for topic '%s'\n", message->payloadlen, (char*) message->payload, message->topic);
+	printf("RECV = %d\n",recv);
+	//clock_gettime(CLOCK_REALTIME, &end_time);
+	//printf("s_time.tv_sec:%ld, s_time.tv_nsec:%09ld\n\n", start_time.tv_sec, start_time.tv_nsec);
+	clock_gettime(CLOCK_REALTIME, &start_time);
+	/*
+	   mosquitto_topic_matches_sub("/devices/wb-adc/controls/+", message->topic, &match);
+	   if (match) {
+	   printf("got message for ADC topic\n");
+	   }
+	 */
 }
 
 int main(int argc, char *argv[])
@@ -48,25 +76,31 @@ int main(int argc, char *argv[])
 	mosquitto_lib_init();
 
 	memset(clientid, 0, 24);
-	snprintf(clientid, 23, "mysql_log_%d", getpid());
+	//snprintf(clientid, 23, "mysql_log_%d", getpid());
+	sprintf(clientid, "Subcriber-%d", getpid());
 	mosq = mosquitto_new(clientid, true, 0);
-	
+
 	if(mosq){
 		mosquitto_connect_callback_set(mosq, connect_callback);
 		mosquitto_message_callback_set(mosq, message_callback);
 
-	    rc = mosquitto_connect(mosq, mqtt_host, mqtt_port, 60);
-		mosquitto_max_inflight_messages_set( mosq, 100000);
+		rc = mosquitto_connect(mosq, mqtt_host, mqtt_port, 60);
+		mosquitto_max_inflight_messages_set( mosq, 1000000);
 		mosquitto_subscribe(mosq, &chk_recved, "ABC", 2);
 
+		//start thread
+		mosquitto_loop_start(mosq);
+
 		while(run){
-			rc = mosquitto_loop(mosq, -1, 1);
+			//rc = mosquitto_loop(mosq, -1, 1);
+			rc = 0;
 			if(run && rc){
 				printf("connection error!\n");
 				sleep(10);
 				mosquitto_reconnect(mosq);
 			}
 		}
+		mosquitto_loop_stop(mosq, 1);
 		mosquitto_destroy(mosq);
 	}
 

@@ -41,7 +41,8 @@ int main(int argc, char *argv[])
 	mosquitto_lib_init();
 
 	memset(clientid, 0, 24);
-	snprintf(clientid, 23, "mysql_log_%d", getpid());
+	//snprintf(clientid, 23, "mysql_log_%d", getpid());
+	sprintf(clientid, "Publisher-%d", getpid());
 	mosq = mosquitto_new(clientid, true, 0);
 
 	if(mosq){
@@ -50,23 +51,25 @@ int main(int argc, char *argv[])
 		rc = mosquitto_connect(mosq, mqtt_host, mqtt_port, 60);
 		mosquitto_max_inflight_messages_set( mosq, 1000000);
 
+		mosquitto_loop_start(mosq);
 
 		int i;
 		char msg[128];
 		for ( i = 0; i < atoi(argv[1]); i++) {
-			mosquitto_loop(mosq, -1, 1);
+			//mosquitto_loop(mosq, -1, 1);
 			sprintf(msg, "Hello %d", i);
-			int ret = mosquitto_publish(mosq, &chk_sended, "ABC", strlen(msg), msg,2,true);
-			printf("Send %d\n",chk_sended);
+			int ret = mosquitto_publish(mosq, &chk_sended, "ABC", strlen(msg), msg,2,false);
+			//printf("Send %d\n",chk_sended);
 			if (ret != MOSQ_ERR_SUCCESS) {
 				printf("SEND %d ERROR\n", i);
 			}
-			usleep(10);
+			usleep(150);
 		}
 		while(1 && run) {
-			mosquitto_loop(mosq, -1, 1);
+			//mosquitto_loop(mosq, -1, 1);
 		}
 		mosquitto_destroy(mosq);
+		mosquitto_loop_stop(mosq,1);
 	}
 
 	mosquitto_lib_cleanup();
